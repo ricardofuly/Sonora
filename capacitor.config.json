@@ -1,0 +1,11 @@
+{
+  "appId": "com.sonora.player",
+  "appName": "Sonora",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#0f0d17"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

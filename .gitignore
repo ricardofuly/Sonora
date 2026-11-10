@@ -1,0 +1,36 @@
+# Dependências e builds
+node_modules/
+dist/
+release/
+*.apk
+*.aab
+*.zip
+
+# Configurações pessoais e segredos — NUNCA enviar
+.env
+settings.json
+keystore/
+*.keystore
+*.jks
+android/local.properties
+android/keystore.properties
+
+# Android (gerado)
+android/.gradle/
+android/build/
+android/app/build/
+android/app/release/
+android/capacitor-cordova-android-plugins/build/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+android/.idea/
+*.iml
+
+# Sistema / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/
+*.log

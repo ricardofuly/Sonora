@@ -1,0 +1,66 @@
+/* Indicador de download nas listas (APK) */
+.dl-badge { display:inline-flex; align-items:center; gap:3px; margin-right:6px; vertical-align:-2px; color:var(--muted); font-size:11px; font-variant-numeric:tabular-nums; }
+.dl-badge.done { color:var(--accent); }
+.spin { animation:dl-spin 1s linear infinite; }
+@keyframes dl-spin { to { transform:rotate(360deg); } }
+.panel .seg { margin-bottom:8px; }
+
+/* App de desktop: faixa de título (arrastável) com espaço para os botões da janela */
+/* Desktop sem barra de título: os botões da janela flutuam no canto e
+   o logo do menu e a faixa da busca servem para arrastar a janela (duplo clique maximiza) */
+.titlebar { position:fixed; top:8px; right:10px; height:30px; z-index:100; user-select:none; }
+[data-desktop] .sidebar .logo, [data-desktop] .searchbar { -webkit-app-region:drag; }
+[data-desktop] .searchbar { padding-right:150px; } /* não deixa a busca ficar embaixo dos botões */
+[data-desktop] .main { scrollbar-gutter:stable; }
+.tb-buttons { display:flex; gap:4px; height:100%; -webkit-app-region:no-drag; }
+.tb-buttons button { width:40px; height:100%; display:grid; place-items:center; color:var(--muted); border-radius:calc(var(--radius) * .7); background:transparent; transition:background .12s, color .12s; }
+.tb-buttons button:hover { background:var(--hover); color:var(--text); }
+.tb-buttons button:active { background:var(--surface-3); }
+.tb-buttons .tb-close:hover { background:#e5484d; color:#fff; }
+.tb-buttons .tb-close:active { background:#c93a3f; color:#fff; }
+@media (max-width:520px) { .tb-now { display:none; } }
+[data-desktop] button, [data-desktop] input, [data-desktop] a { -webkit-app-region:no-drag; }
+[data-desktop] .toasts { bottom:104px; }
+
+/* Barra de pesquisa fixa no topo ao rolar (computador; no celular já era fixa) */
+@media (min-width:701px) and (pointer:fine) {
+  .main { padding-top:0; }
+  .searchbar { position:sticky; top:0; z-index:8; max-width:none; margin:0 -28px; padding:18px 28px 14px;
+    background:color-mix(in srgb, var(--bg) 94%, transparent); border-bottom:1px solid transparent; transition:border-color .2s; }
+  [data-effects="on"] .searchbar { backdrop-filter:blur(14px) saturate(1.3); }
+  .searchbar input { flex:0 1 460px; }
+  [data-desktop] .searchbar { padding-right:150px; }
+  .main.scrolled .searchbar { border-bottom-color:color-mix(in srgb, var(--border) 60%, transparent); }
+}
+
+/* Capa das playlists do usuário (menu lateral e biblioteca) */
+.pl-cover { width:28px; height:28px; flex-shrink:0; border-radius:calc(var(--radius) * .45); overflow:hidden; background:var(--surface-2);
+  display:grid; place-items:center; color:var(--muted); box-shadow:0 1px 3px #0004; }
+.pl-cover img { width:100%; height:100%; object-fit:cover; display:block; }
+.pl-cover.mosaic { grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; place-items:stretch; }
+.pl-cover.empty { background:color-mix(in srgb, var(--accent) 18%, var(--surface)); color:var(--accent); }
+.pl-cover.lg { width:52px; height:52px; border-radius:calc(var(--radius) * .7); }
+.nav .pl-cover { margin:-3px 0; }
+.nav.active .pl-cover { box-shadow:0 0 0 2px var(--accent); }
+.app.collapsed .nav .pl-cover { width:34px; height:34px; margin:0; }
+
+/* Botões redondos e ícones nunca encolhem (evita play oval e ícones espremidos) */
+.bigplay, .fp-play, .big, .icon, .fab, .heart, .back, .logo-mark, .swatch { flex-shrink:0; aspect-ratio:1; }
+.lbl-short { display:none; }
+.list-actions { flex-wrap:nowrap; }
+.list-actions .ghost { white-space:nowrap; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+
+/* "Tocando de <playlist>" no player em tela cheia */
+.fp-source { display:flex; flex-direction:column; align-items:center; min-width:0; max-width:70%; color:var(--text); line-height:1.25; }
+.fp-source small { font-size:11px; font-weight:650; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); }
+.fp-source b { font-size:13px; font-weight:650; text-transform:none; letter-spacing:0; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fp-source:not(:disabled):active b { color:var(--accent); }
+
+@media (max-width:700px), (max-height:500px) and (pointer:coarse) {
+  .lbl-long { display:none; }
+  .lbl-short { display:inline; }
+  .list-actions { gap:12px; }
+  .list-actions .ghost { padding:9px 14px; }
+  .list-actions .icon { margin-left:auto; }
+  .header .play-all, .header .ghost { padding:9px 14px; }
+}
