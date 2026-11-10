@@ -277,9 +277,13 @@ app.get('/api/lyrics', async (req, res) => {
 
 // ---------- Discord Rich Presence ----------
 let rpc = null, rpcReady = false, rpcError = '', rpcUser = '', retryTimer = null, connecting = false;
+// Application ID do app "Sonora" no Discord. É um identificador público (não é senha nem segredo):
+// o Rich Presence só precisa dele. Quem quiser pode trocar em Configurações → Discord.
+const DEFAULT_DISCORD_CLIENT_ID = '1569822693581258834';
 const discordCfg = () => {
   const s = loadSettings();
-  return { enabled: s.discordEnabled !== false, clientId: (s.discordClientId || process.env.DISCORD_CLIENT_ID || '').trim() };
+  const custom = (s.discordClientId || process.env.DISCORD_CLIENT_ID || '').trim();
+  return { enabled: s.discordEnabled !== false, clientId: custom || DEFAULT_DISCORD_CLIENT_ID, isDefault: !custom };
 };
 
 async function disconnectRpc() {
@@ -316,8 +320,8 @@ async function connectRpc() {
 connectRpc();
 
 const discordStatus = () => {
-  const { enabled, clientId } = discordCfg();
-  return { enabled, clientId, configured: !!clientId, connected: rpcReady, user: rpcUser, error: rpcReady ? '' : rpcError };
+  const { enabled, clientId, isDefault } = discordCfg();
+  return { enabled, clientId: isDefault ? '' : clientId, isDefault, configured: !!clientId, connected: rpcReady, user: rpcUser, error: rpcReady ? '' : rpcError };
 };
 app.get('/api/presence/status', (_req, res) => res.json(discordStatus()));
 app.post('/api/presence/settings', async (req, res) => {

@@ -280,7 +280,7 @@ function DiscordPanel({ discord, setDiscord, showToast }) {
         <span />Mostrar o que estou ouvindo no Discord
       </label>
       <form className="row" onSubmit={e => { e.preventDefault(); call('/api/presence/settings', { clientId: id }); }}>
-        <input value={id} onChange={e => setId(e.target.value)} placeholder="Application ID do Discord" inputMode="numeric" />
+        <input value={id} onChange={e => setId(e.target.value)} placeholder="Opcional: usando o app oficial do Sonora" inputMode="numeric" title="Deixe vazio para usar o app oficial do Sonora no Discord" />
         <button className="btn" disabled={busy}>Salvar ID</button>
         <button type="button" className="ghost" disabled={busy || !discord?.enabled} onClick={() => call('/api/presence/reconnect')}><RefreshCw size={15} /> Reconectar</button>
       </form>
