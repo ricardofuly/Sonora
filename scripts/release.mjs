@@ -49,11 +49,14 @@ run(`"${sevenZip}" a -tzip "${webZip}" .\\*`, { cwd: path.join(ROOT, 'dist') });
 
 // 3) APK assinado
 run('npx cap sync android');
-const gradle = process.platform === 'win32' ? 'gradlew.bat' : './gradlew';
-run(`${gradle} assembleRelease --no-daemon -q`, {
+// caminho completo: no Windows o diretório atual pode não estar no caminho de busca de executáveis
+const gradle = `"${path.join(ROOT, 'android', process.platform === 'win32' ? 'gradlew.bat' : 'gradlew')}"`;
+const gradleOpts = {
   cwd: path.join(ROOT, 'android'),
   env: { ...process.env, JAVA_HOME: process.env.JAVA_HOME || 'C:\\Program Files\\Android\\Android Studio\\jbr' },
-});
+};
+try { run(`${gradle} assembleRelease --no-daemon -q`, gradleOpts); }
+catch { console.log('Gradle falhou; tentando de novo uma vez…'); run(`${gradle} assembleRelease --no-daemon`, gradleOpts); }
 const apkOut = path.join(out, `Sonora-${version}.apk`);
 fs.copyFileSync(path.join(ROOT, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk'), apkOut);
 

@@ -1,5 +1,27 @@
 # Sonora — player de músicas do YouTube com status no Discord
 
+**Baixar:** [última versão](https://github.com/ricardofuly/Sonora/releases/latest) (instalador do Windows e APK do Android)
+· [Termos de Serviço](https://ricardofuly.github.io/Sonora/termos.html)
+· [Política de Privacidade](https://ricardofuly.github.io/Sonora/privacidade.html)
+
+## Atualizações automáticas
+- **Windows:** o app procura versões novas nas releases do GitHub ao abrir e a cada 4 h, baixa em segundo plano
+  e instala ao sair (ou na hora, em Configurações → Atualizações → "Reiniciar e instalar").
+- **Android:** ao abrir e a cada 6 h o app lê o `update.json` da última release:
+  - se só a interface mudou, baixa o pacote web e aplica sem reinstalar (*live update*), com volta automática
+    para a versão anterior se a nova não abrir;
+  - se a parte nativa mudou, oferece baixar e instalar o APK novo.
+
+### Publicar uma versão nova
+Pré-requisitos (uma vez): `gh auth login`, Android Studio e a chave de assinatura em `keystore/` +
+`android/keystore.properties` (fora do git — **guarde um backup**: sem ela os celulares não aceitam atualizações).
+
+```
+npm run release -- 1.2.0 --notes "O que mudou"            # só a interface mudou → live update no celular
+npm run release -- 1.2.0 --native --notes "O que mudou"   # mudou código em android/ → APK novo
+```
+O script gera o instalador, o APK assinado, o pacote web e o `update.json`, cria a tag e publica a release.
+
 ## Rodar
 1. `npm install`
 2. Discord: crie um app em https://discord.com/developers/applications (o nome do app aparece como "Ouvindo <nome>"),
