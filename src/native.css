@@ -64,3 +64,9 @@
   .list-actions .icon { margin-left:auto; }
   .header .play-all, .header .ghost { padding:9px 14px; }
 }
+
+/* Botão de ação dentro dos alertas (ex.: 'Reiniciar agora') */
+.toast-action { flex-shrink:0; padding:6px 12px; border-radius:999px; background:var(--accent); color:var(--on-accent); font-weight:700; font-size:13px; }
+.toast-action:hover { filter:brightness(1.1); }
+.panel a { color:var(--accent); }
+

@@ -12,10 +12,12 @@
     "build": "vite build",
     "start": "node server.js",
     "desktop": "vite build && electron .",
-    "dist:win": "vite build && electron-builder --win"
+    "dist:win": "vite build && electron-builder --win",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@xhayper/discord-rpc": "^1.2.1",
+    "electron-updater": "^6.3.9",
     "express": "^4.21.2",
     "music-metadata": "^11.16.1",
     "youtubei.js": "^18.3.0",
@@ -70,6 +72,14 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Sonora",
       "artifactName": "Sonora-Setup-${version}.exe"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "ricardofuly",
+        "repo": "Sonora",
+        "releaseType": "release"
+      }
+    ]
   }
 }

@@ -1,14 +1,35 @@
 apply plugin: 'com.android.application'
 
+// Versão: versionName vem do package.json (mesma da interface e do desktop);
+// versionCode vem de android/native-version.txt e só sobe quando a parte nativa muda.
+def pkg = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json'))
+def nativeCode = rootProject.file('native-version.txt').text.trim().toInteger()
+
+// Assinatura: chave fora do git (android/keystore.properties). A mesma chave em todas as versões
+// permite instalar atualizações por cima sem perder dados.
+def ksProps = new Properties()
+def ksFile = rootProject.file('keystore.properties')
+if (ksFile.exists()) ksFile.withInputStream { ksProps.load(it) }
+
 android {
+    signingConfigs {
+        release {
+            if (ksFile.exists()) {
+                storeFile file(ksProps['storeFile'])
+                storePassword ksProps['storePassword']
+                keyAlias ksProps['keyAlias']
+                keyPassword ksProps['keyPassword']
+            }
+        }
+    }
     namespace "com.sonora.player"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
         applicationId "com.sonora.player"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode nativeCode
+        versionName pkg.version
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -23,6 +44,7 @@ android {
     }
     buildTypes {
         release {
+            if (ksFile.exists()) signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

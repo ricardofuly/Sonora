@@ -104,6 +104,40 @@ ipcMain.on('win:toggle-maximize', () => { if (!win) return; win.isMaximized() ? 
 ipcMain.on('win:close', () => win?.close()); // passa pelo "close": esconde na bandeja
 ipcMain.handle('win:is-maximized', () => !!win?.isMaximized());
 
+// ---------- Atualização automática (releases do GitHub) ----------
+let updateStatus = { state: 'idle', version: null, progress: 0, error: null };
+let autoUpdater = null;
+function setUpdate(patch) {
+  updateStatus = { ...updateStatus, ...patch };
+  win?.webContents.send('update:status', updateStatus);
+}
+async function initUpdates() {
+  if (!app.isPackaged) { setUpdate({ state: 'dev' }); return; } // só no app instalado
+  const mod = await import('electron-updater');
+  autoUpdater = (mod.default || mod).autoUpdater;
+  autoUpdater.autoDownload = true;           // baixa em segundo plano
+  autoUpdater.autoInstallOnAppQuit = true;   // instala ao sair do app
+  autoUpdater.on('checking-for-update', () => setUpdate({ state: 'checking', error: null }));
+  autoUpdater.on('update-not-available', () => setUpdate({ state: 'latest' }));
+  autoUpdater.on('update-available', i => setUpdate({ state: 'downloading', version: i.version, progress: 0 }));
+  autoUpdater.on('download-progress', p => setUpdate({ state: 'downloading', progress: p.percent / 100 }));
+  autoUpdater.on('update-downloaded', i => {
+    setUpdate({ state: 'ready', version: i.version, progress: 1 });
+    if (Notification.isSupported()) {
+      const n = new Notification({ title: `Sonora ${i.version} pronto para instalar`, body: 'Será instalado quando você sair do app. Clique para reiniciar agora.', icon: iconPath() });
+      n.on('click', () => { quitting = true; autoUpdater.quitAndInstall(); });
+      n.show();
+    }
+  });
+  autoUpdater.on('error', e => setUpdate({ state: 'error', error: String(e?.message || e).split('\n')[0].slice(0, 200) }));
+  const check = () => autoUpdater.checkForUpdates().catch(() => {});
+  setTimeout(check, 8000);                 // logo depois de abrir
+  setInterval(check, 4 * 60 * 60 * 1000);  // e a cada 4 horas
+}
+ipcMain.handle('update:get', () => ({ ...updateStatus, current: app.getVersion() }));
+ipcMain.handle('update:check', async () => { if (autoUpdater) await autoUpdater.checkForUpdates().catch(() => {}); return { ...updateStatus, current: app.getVersion() }; });
+ipcMain.on('update:install', () => { if (autoUpdater && updateStatus.state === 'ready') { quitting = true; autoUpdater.quitAndInstall(); } });
+
 app.on('second-instance', showWindow);
 app.on('before-quit', () => { quitting = true; });
 app.on('window-all-closed', () => { /* continua na bandeja */ });
@@ -113,6 +147,7 @@ app.whenReady().then(async () => {
     const port = await startServer();
     createTray();
     createWindow(port);
+    initUpdates();
   } catch (e) {
     const { dialog } = await import('electron');
     dialog.showErrorBox('Sonora', `Não foi possível iniciar o Sonora:\n\n${e?.stack || e}`);

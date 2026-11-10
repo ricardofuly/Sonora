@@ -3,6 +3,7 @@ import { usePlayer } from './usePlayer.js';
 import { useNativePlayer } from './useNativePlayer.js';
 import { isNative, Sonora } from './native.js';
 import { searchTracks, loadHome as apiHome, loadPlaylist, loadLyrics } from './api.js';
+import { REPO, APP_VERSION, isDesktop, checkMobileUpdate, confirmBundleWorks, downloadWebUpdate, activateWebUpdate, installApkUpdate } from './updates.js';
 import {
   House, Search, Library, Plus, Music2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Volume1, VolumeX,
   MicVocal, X, ChevronLeft, ListMusic, Folder, FolderPlus, Check, Settings as SettingsIcon, RefreshCw, Heart, AudioLines,
@@ -167,6 +168,61 @@ function AppearancePanel({ appearance: a, setAppearance }) {
   );
 }
 
+function UpdatesPanel({ showToast }) {
+  const [st, setSt] = useState({ current: APP_VERSION, state: 'idle' });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (isDesktop) {
+      window.sonoraUpdates.get().then(setSt);
+      return window.sonoraUpdates.onStatus(s => setSt(p => ({ ...p, ...s })));
+    }
+    if (isNative) Sonora.getAppInfo().then(i => setSt(p => ({ ...p, current: i.bundleVersion, native: i.versionName })));
+  }, []);
+  const check = async () => {
+    setBusy(true);
+    try {
+      if (isDesktop) setSt(await window.sonoraUpdates.check());
+      else if (isNative) {
+        const u = await checkMobileUpdate();
+        if (u.type === 'none') { setSt(p => ({ ...p, state: 'latest' })); showToast('Você já está na versão mais recente.', 'ok', 3000); }
+        else if (u.type === 'web') {
+          setSt(p => ({ ...p, state: 'downloading', version: u.version }));
+          await downloadWebUpdate(u);
+          setSt(p => ({ ...p, state: 'ready', version: u.version }));
+        } else setSt(p => ({ ...p, state: 'apk', version: u.version, apk: u }));
+      }
+    } catch (e) { setSt(p => ({ ...p, state: 'error', error: e.message })); }
+    finally { setBusy(false); }
+  };
+  const label = {
+    idle: 'Atualizações automáticas ativadas', dev: 'Versão de desenvolvimento (sem atualização automática)',
+    checking: 'Procurando atualizações…', latest: 'Você está na versão mais recente',
+    downloading: `Baixando a versão ${st.version || ''}${st.progress ? ` (${Math.round(st.progress * 100)}%)` : ''}…`,
+    ready: `Versão ${st.version} pronta para instalar`, apk: `Nova versão do app: ${st.version}`, error: `Erro: ${st.error || 'falha ao verificar'}`,
+  }[st.state] || '';
+  const install = () => {
+    if (isDesktop) window.sonoraUpdates.install();
+    else if (st.state === 'ready') activateWebUpdate();
+    else if (st.apk) installApkUpdate(st.apk).then(r => r.status === 'needs-permission' && showToast('Permita "instalar apps desta fonte" para o Sonora e toque em Instalar de novo.', 'error', 12000));
+  };
+  return (
+    <section className="panel">
+      <h2><Download size={18} /> Atualizações</h2>
+      <p className="muted">Versão instalada: <b>{st.current}</b>{st.native && st.native !== st.current ? ` (app ${st.native})` : ''}. {isDesktop || isNative
+        ? 'O Sonora procura atualizações sozinho e baixa das releases do GitHub.'
+        : 'Na versão do navegador, atualize o projeto com git pull e reinicie o servidor.'}</p>
+      {(isDesktop || isNative) && <>
+        <div className={`dstatus ${st.state === 'error' ? 'err' : st.state === 'ready' || st.state === 'apk' ? 'on' : ''}`}><span className="dot" />{label}</div>
+        <div className="row">
+          <button className="ghost" disabled={busy || st.state === 'dev'} onClick={check}><RefreshCw size={15} /> Verificar agora</button>
+          {(st.state === 'ready' || st.state === 'apk') && <button className="btn" onClick={install}><Download size={15} /> {isDesktop ? 'Reiniciar e instalar' : 'Instalar agora'}</button>}
+        </div>
+      </>}
+      <p className="muted small"><a href={`https://github.com/${REPO}/releases`} target="_blank" rel="noreferrer">Ver todas as versões</a> · <a href={`https://ricardofuly.github.io/Sonora/termos.html`} target="_blank" rel="noreferrer">Termos</a> · <a href={`https://ricardofuly.github.io/Sonora/privacidade.html`} target="_blank" rel="noreferrer">Privacidade</a></p>
+    </section>
+  );
+}
+
 function MediaKeysPanel({ showToast }) {
   const [st, setSt] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -327,6 +383,7 @@ function Settings({ genres, setGenres, onLocalChange, appearance, setAppearance,
         </div>
         {msg && <p className="muted small">{msg}</p>}
       </section>}
+      <UpdatesPanel showToast={showToast} />
       {!isNative && <MediaKeysPanel showToast={showToast} />}
       {!isNative && <DiscordPanel discord={discord} setDiscord={setDiscord} showToast={showToast} />}
     </div>
@@ -473,9 +530,10 @@ export default function App() {
   const [appearance, setAppearance] = useState(() => ({ ...DEFAULT_APPEARANCE, effects: !(navigator.deviceMemory && navigator.deviceMemory <= 4), ...store.get('sonora.appearance', {}) }));
   useEffect(() => { applyAppearance(appearance); store.set('sonora.appearance', appearance); }, [appearance]);
   const [toasts, setToasts] = useState([]);
-  const showToast = (text, kind = 'error', ms = 6000) => {
+  // action (opcional): { label, run } — vira um botão no alerta
+  const showToast = (text, kind = 'error', ms = 6000, action = null) => {
     const id = Math.random();
-    setToasts(ts => [...ts.filter(t => t.text !== text), { id, text, kind }]);
+    setToasts(ts => [...ts.filter(t => t.text !== text), { id, text, kind, action }]);
     setTimeout(() => setToasts(ts => ts.filter(t => t.id !== id)), ms);
   };
   const [menu, setMenu] = useState(null);
@@ -506,6 +564,43 @@ export default function App() {
   useEffect(() => { if (isNative && player.error) showToast('Não foi possível tocar esta música. Pulando…'); }, [player.error]);
 
   useEffect(() => { if (!isNative && current && (player.ready || current.source === 'local')) player.load(current); }, [playToken, player.ready]);
+
+  // ---------- Atualizações automáticas ----------
+  useEffect(() => {
+    // Desktop: o Electron baixa sozinho; avisamos quando estiver pronto
+    if (isDesktop) {
+      return window.sonoraUpdates.onStatus(s => {
+        if (s.state === 'ready') showToast(`Sonora ${s.version} baixado. Ele será instalado quando você sair do app.`, 'ok', 15000,
+          { label: 'Reiniciar agora', run: () => window.sonoraUpdates.install() });
+      });
+    }
+    if (!isNative) return;
+    // Android: confirma que esta interface abriu bem e procura atualizações (ao abrir e a cada 6 h)
+    confirmBundleWorks();
+    let readyToActivate = false;
+    const onHidden = () => { if (document.visibilityState === 'hidden' && readyToActivate) { readyToActivate = false; activateWebUpdate().catch(() => {}); } };
+    document.addEventListener('visibilitychange', onHidden);
+    const run = async () => {
+      try {
+        const u = await checkMobileUpdate();
+        if (u.type === 'apk') {
+          showToast(`Nova versão do Sonora (${u.version}) disponível.`, 'ok', 20000, {
+            label: 'Atualizar', run: () => installApkUpdate(u)
+              .then(r => r.status === 'needs-permission' && showToast('Permita "instalar apps desta fonte" para o Sonora e toque em Atualizar de novo.', 'error', 12000))
+              .catch(e => showToast(e.message || 'Falha ao baixar a atualização.')),
+          });
+        } else if (u.type === 'web') {
+          await downloadWebUpdate(u);
+          readyToActivate = true;
+          showToast(`Atualização ${u.version} baixada. Ela será aplicada quando você sair do app.`, 'ok', 12000,
+            { label: 'Aplicar agora', run: () => activateWebUpdate().catch(() => {}) });
+        }
+      } catch { /* sem internet: tenta de novo mais tarde */ }
+    };
+    const first = setTimeout(run, 10000);
+    const every = setInterval(run, 6 * 60 * 60 * 1000);
+    return () => { clearTimeout(first); clearInterval(every); document.removeEventListener('visibilitychange', onHidden); };
+  }, []);
 
   // PC: teclas multimídia do teclado chegam do servidor (funciona com o navegador minimizado)
   const keyActions = useRef({});
@@ -842,6 +937,7 @@ export default function App() {
           <div key={t.id} className={`toast ${t.kind}`}>
             <span className="toast-ico">{t.kind === 'ok' ? <CircleCheck size={20} /> : <CircleAlert size={20} />}</span>
             <span>{t.text}</span>
+            {t.action && <button className="toast-action" onClick={() => { setToasts(ts => ts.filter(x => x.id !== t.id)); t.action.run(); }}>{t.action.label}</button>}
             <button className="icon" onClick={() => setToasts(ts => ts.filter(x => x.id !== t.id))} title="Fechar"><X size={16} /></button>
           </div>
         ))}

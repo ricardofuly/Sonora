@@ -45,6 +45,9 @@ public class SonoraPlugin extends Plugin {
     @Override
     public void load() {
         YtExtractor.init(getContext());
+        Updater.dropStaleBundle(getContext());
+        // Interface nova ainda não confirmou que abriu? Dá um prazo; se falhar, volta para a anterior.
+        if (Updater.prefs(getContext()).getBoolean("pending", false)) armRollback();
         SessionToken token = new SessionToken(getContext(), new ComponentName(getContext(), PlaybackService.class));
         controllerFuture = new MediaController.Builder(getContext(), token).buildAsync();
         controllerFuture.addListener(() -> {
@@ -209,6 +212,94 @@ public class SonoraPlugin extends Plugin {
                 try { call.resolve(fn.apply(controller)); } catch (Exception e) { call.reject(e.getMessage()); }
             };
             if (controller != null) r.run(); else pending.add(r);
+        });
+    }
+
+    // ---------------- Atualizações ----------------
+    private Runnable rollback;
+
+    private void armRollback() {
+        if (rollback != null) main.removeCallbacks(rollback);
+        rollback = () -> {
+            android.util.Log.w("Sonora", "Interface nova não abriu a tempo: voltando para a anterior");
+            Updater.clearBundle(getContext());
+            getBridge().setServerAssetPath("public");
+        };
+        main.postDelayed(rollback, 15_000);
+    }
+
+    @PluginMethod
+    public void getAppInfo(PluginCall call) {
+        JSObject o = new JSObject();
+        o.put("versionName", Updater.versionName(getContext()));
+        o.put("versionCode", Updater.versionCode(getContext()));
+        o.put("bundleVersion", Updater.bundleVersion(getContext()));
+        o.put("canInstall", Updater.canInstall(getContext()));
+        call.resolve(o);
+    }
+
+    /** A interface chama isto ao abrir: confirma que a versão atual funciona e limpa pacotes antigos. */
+    @PluginMethod
+    public void notifyReady(PluginCall call) {
+        if (rollback != null) { main.removeCallbacks(rollback); rollback = null; }
+        Updater.prefs(getContext()).edit().putBoolean("pending", false).apply();
+        net.submit(() -> Updater.cleanupBundles(getContext()));
+        call.resolve();
+    }
+
+    /** Live update: baixa a interface nova e passa a usá-la (recarrega a tela). */
+    @PluginMethod
+    public void applyWebBundle(PluginCall call) {
+        String url = call.getString("url"), version = call.getString("version");
+        boolean reloadNow = Boolean.TRUE.equals(call.getBoolean("reloadNow", true));
+        if (url == null || version == null) { call.reject("url e version são obrigatórios"); return; }
+        net.submit(() -> {
+            try {
+                java.io.File dir = Updater.downloadBundle(getContext(), url, version, f -> {
+                    JSObject ev = new JSObject(); ev.put("kind", "web"); ev.put("progress", f); notifyListeners("update", ev);
+                });
+                String path = dir.getAbsolutePath();
+                // grava para as próximas aberturas e marca como "a confirmar"
+                getContext().getSharedPreferences(Updater.CAP_PREFS, android.content.Context.MODE_PRIVATE).edit().putString(Updater.CAP_PATH_KEY, path).apply();
+                Updater.prefs(getContext()).edit().putString("bundleVersion", version).putBoolean("pending", true).apply();
+                JSObject r = new JSObject(); r.put("version", version); r.put("applied", reloadNow);
+                call.resolve(r);
+                if (reloadNow) main.post(() -> { armRollback(); getBridge().setServerBasePath(path); });
+            } catch (Exception e) {
+                call.reject("Falha ao baixar a atualização: " + e.getMessage());
+            }
+        });
+    }
+
+    /** Passa a usar agora a interface já baixada (recarrega a tela; a música nativa continua tocando). */
+    @PluginMethod
+    public void activateBundle(PluginCall call) {
+        java.io.File dir = Updater.activeBundleDir(getContext());
+        if (dir == null) { call.reject("Nenhuma atualização baixada"); return; }
+        call.resolve();
+        main.post(() -> { armRollback(); getBridge().setServerBasePath(dir.getAbsolutePath()); });
+    }
+
+    /** APK novo: baixa e abre o instalador do Android. */
+    @PluginMethod
+    public void installApk(PluginCall call) {
+        String url = call.getString("url");
+        if (url == null) { call.reject("url obrigatória"); return; }
+        if (!Updater.canInstall(getContext())) {
+            Updater.openInstallPermission(getContext());
+            JSObject r = new JSObject(); r.put("status", "needs-permission"); call.resolve(r);
+            return;
+        }
+        net.submit(() -> {
+            try {
+                java.io.File apk = Updater.downloadApk(getContext(), url, f -> {
+                    JSObject ev = new JSObject(); ev.put("kind", "apk"); ev.put("progress", f); notifyListeners("update", ev);
+                });
+                main.post(() -> Updater.launchInstaller(getContext(), apk));
+                JSObject r = new JSObject(); r.put("status", "installing"); call.resolve(r);
+            } catch (Exception e) {
+                call.reject("Falha ao baixar o app: " + e.getMessage());
+            }
         });
     }
 
