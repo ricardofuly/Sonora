@@ -9,7 +9,13 @@
 /* Desktop sem barra de título: os botões da janela flutuam no canto e
    o logo do menu e a faixa da busca servem para arrastar a janela (duplo clique maximiza) */
 .titlebar { position:fixed; top:8px; right:10px; height:30px; z-index:100; user-select:none; }
-[data-desktop] .sidebar .logo, [data-desktop] .searchbar { -webkit-app-region:drag; }
+/* No Windows, regiões de arrasto ignoram a sobreposição de elementos: se uma ficar embaixo dos botões
+   da janela, os cliques viram "arrastar". Por isso a área de arrasto da busca termina antes deles. */
+[data-desktop] .sidebar .logo { -webkit-app-region:drag; }
+.drag-zone { display:none; }
+[data-desktop] .drag-zone { display:block; position:absolute; top:0; bottom:0; left:0; right:160px; -webkit-app-region:drag; z-index:0; }
+[data-desktop] .searchbar { position:sticky; }
+[data-desktop] .searchbar > input, [data-desktop] .searchbar > button { position:relative; z-index:1; -webkit-app-region:no-drag; }
 [data-desktop] .searchbar { padding-right:150px; } /* não deixa a busca ficar embaixo dos botões */
 [data-desktop] .main { scrollbar-gutter:stable; }
 .tb-buttons { display:flex; gap:4px; height:100%; -webkit-app-region:no-drag; }

@@ -787,6 +787,8 @@ export default function App() {
 
       <main className="main" onScroll={e => e.currentTarget.classList.toggle('scrolled', e.currentTarget.scrollTop > 4)}>
         <form className="searchbar" onSubmit={search}>
+          {/* desktop: faixa invisível para arrastar a janela; termina antes dos botões da janela */}
+          <span className="drag-zone" aria-hidden="true" />
           <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Buscar músicas, artistas…" />
           <button>Buscar</button>
         </form>
