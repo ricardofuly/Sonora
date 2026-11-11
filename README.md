@@ -4,6 +4,24 @@
 · [Termos de Serviço](https://ricardofuly.github.io/Sonora/termos.html)
 · [Política de Privacidade](https://ricardofuly.github.io/Sonora/privacidade.html)
 
+## Prints
+
+![Tela Início do Sonora no Windows, com prateleiras de playlists por estilo](docs/screenshots/desktop-inicio.jpg)
+
+| Playlist aberta | Temas e cores |
+|---|---|
+| ![Página de playlist com banner, lista de músicas e player tocando](docs/screenshots/desktop-playlist.jpg) | ![Configurações de aparência com 8 temas e cores de destaque](docs/screenshots/desktop-temas.jpg) |
+
+<p align="center">
+  <img src="docs/screenshots/android-playlist.jpg" width="260" alt="App Android: playlist com mini player" />
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/android-player.jpg" width="260" alt="App Android: player em tela cheia" />
+</p>
+
+**Recursos:** busca no YouTube · playlists e álbuns · biblioteca com curtidas e músicas locais · karaokê com letras
+sincronizadas · 8 temas e cores · status "Ouvindo" no Discord · teclas multimídia · app de Windows com bandeja ·
+app Android que toca com a tela apagada, responde a fones e relógios e baixa músicas para ouvir offline.
+
 ## Atualizações automáticas
 - **Windows:** o app procura versões novas nas releases do GitHub ao abrir e a cada 4 h, baixa em segundo plano
   e instala ao sair (ou na hora, em Configurações → Atualizações → "Reiniciar e instalar").
