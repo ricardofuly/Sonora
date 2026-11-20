@@ -308,12 +308,21 @@ public class SonoraPlugin extends Plugin {
     public void getSettings(PluginCall call) {
         JSObject o = new JSObject();
         o.put("quality", YtExtractor.getQuality());
+        o.put("normalize", YtExtractor.getNormalize());
         o.put("downloadsBytes", Downloads.totalBytes(getContext()));
         call.resolve(o);
     }
     @PluginMethod
     public void setQuality(PluginCall call) {
         YtExtractor.setQuality(call.getString("quality", "normal"));
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setNormalize(PluginCall call) {
+        boolean v = Boolean.TRUE.equals(call.getBoolean("enabled", true));
+        YtExtractor.setNormalize(v);
+        LoudnessNormalizer.setEnabled(v); // mesmo processo do serviço: vale na hora
         call.resolve();
     }
 

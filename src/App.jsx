@@ -288,6 +288,19 @@ function DiscordPanel({ discord, setDiscord, showToast }) {
   );
 }
 
+function NormalizePanel({ normalize, setNormalize }) {
+  return (
+    <section className="panel">
+      <h2><AudioLines size={18} /> Volume das músicas</h2>
+      <p className="muted">Deixa todas as músicas com volume parecido, sem precisar mexer no volume a cada faixa.{!isNative && ' Para isso o volume geral fica um pouco mais baixo; aumente no controle de volume se precisar.'}</p>
+      <label className="switch">
+        <input type="checkbox" checked={normalize} onChange={e => setNormalize(e.target.checked)} />
+        <span />Normalizar volume
+      </label>
+    </section>
+  );
+}
+
 function DlBadge({ id, done, progress }) {
   if (done) return <span className="dl-badge done" title="Baixada"><CircleCheckBig size={13} /></span>;
   if (typeof progress === 'number') return <span className="dl-badge" title="Baixando"><LoaderCircle size={13} className="spin" /> {Math.round(progress * 100)}%</span>;
@@ -316,7 +329,7 @@ function PlaybackPanel({ downloads, onClearDownloads }) {
   );
 }
 
-function Settings({ genres, setGenres, onLocalChange, appearance, setAppearance, discord, setDiscord, showToast, downloads = [], onClearDownloads }) {
+function Settings({ genres, setGenres, onLocalChange, appearance, setAppearance, discord, setDiscord, showToast, downloads = [], onClearDownloads, normalize, setNormalize }) {
   const [custom, setCustom] = useState('');
   const [folders, setFolders] = useState([]);
   const [count, setCount] = useState(0);
@@ -362,6 +375,7 @@ function Settings({ genres, setGenres, onLocalChange, appearance, setAppearance,
         </form>
       </section>
 
+      <NormalizePanel normalize={normalize} setNormalize={setNormalize} />
       {isNative && <PlaybackPanel downloads={downloads} onClearDownloads={onClearDownloads} />}
 
       {!isNative && <section className="panel">
@@ -526,6 +540,8 @@ export default function App() {
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState(false);
   const [volume, setVol] = useState(() => store.get('sonora.volume', 80));
+  const [normalize, setNormalize] = useState(() => store.get('sonora.normalize', true));
+  useEffect(() => store.set('sonora.normalize', normalize), [normalize]);
   const [discord, setDiscord] = useState(null);
   const [appearance, setAppearance] = useState(() => ({ ...DEFAULT_APPEARANCE, effects: !(navigator.deviceMemory && navigator.deviceMemory <= 4), ...store.get('sonora.appearance', {}) }));
   useEffect(() => { applyAppearance(appearance); store.set('sonora.appearance', appearance); }, [appearance]);
@@ -658,6 +674,7 @@ export default function App() {
   };
   const removeDownload = id => Sonora.removeDownload({ id }).then(loadDownloads);
   useEffect(() => { player.setVolume(volume); }, [volume, player.ready]);
+  useEffect(() => { player.setNormalize(normalize); }, [normalize, player.ready]);
 
   // Presença no Discord
   const lastSent = useRef('');
@@ -802,6 +819,7 @@ export default function App() {
             onBack={() => setView({ type: 'home' })} />
         ) : view.type === 'settings' ? (
           <Settings genres={genres} setGenres={g => { setGenres(g); setHome(null); }} onLocalChange={loadLocal} downloads={downloads} onClearDownloads={async () => { for (const d of downloads) await Sonora.removeDownload({ id: d.id }); loadDownloads(); }}
+            normalize={normalize} setNormalize={setNormalize}
             appearance={appearance} setAppearance={setAppearance} discord={discord} setDiscord={setDiscord} showToast={showToast} />
         ) : view.type === 'home' ? (
           <div className="home">

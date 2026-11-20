@@ -47,5 +47,7 @@ export function useNativePlayer(onTrackChange) {
     setShuffle: v => Sonora.setShuffle({ enabled: v }),
     setRepeat: v => Sonora.setRepeat({ enabled: v }),
     setVolume: v => Sonora.setVolume({ volume: v / 100 }),
+    // APKs antigos não têm o método: ignora (a interface pode chegar antes por live update)
+    setNormalize: on => Sonora.setNormalize({ enabled: on }).catch(() => {}),
   };
 }

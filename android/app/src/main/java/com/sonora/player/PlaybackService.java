@@ -16,6 +16,9 @@ import androidx.media3.datasource.DefaultDataSource;
 import androidx.media3.datasource.ResolvingDataSource;
 import androidx.media3.datasource.okhttp.OkHttpDataSource;
 import androidx.media3.exoplayer.DefaultLoadControl;
+import androidx.media3.exoplayer.DefaultRenderersFactory;
+import androidx.media3.exoplayer.audio.AudioSink;
+import androidx.media3.exoplayer.audio.DefaultAudioSink;
 import androidx.media3.exoplayer.ExoPlayer;
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory;
 import androidx.media3.session.MediaSession;
@@ -72,7 +75,21 @@ public class PlaybackService extends MediaSessionService {
                 .setBufferDurationsMs(30_000, 180_000, 2_000, 4_000)
                 .build();
 
-        ExoPlayer player = new ExoPlayer.Builder(this)
+        // Normalização de volume aplicada no áudio decodificado (streaming e downloads)
+        LoudnessNormalizer.setEnabled(YtExtractor.getNormalize());
+        DefaultRenderersFactory renderers = new DefaultRenderersFactory(this) {
+            @Override
+            protected AudioSink buildAudioSink(@NonNull android.content.Context context, boolean enableFloatOutput,
+                                               boolean enableAudioTrackPlaybackParams) {
+                return new DefaultAudioSink.Builder(context)
+                        .setEnableFloatOutput(enableFloatOutput)
+                        .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                        .setAudioProcessors(new androidx.media3.common.audio.AudioProcessor[]{ new LoudnessNormalizer() })
+                        .build();
+            }
+        };
+
+        ExoPlayer player = new ExoPlayer.Builder(this, renderers)
                 .setMediaSourceFactory(new DefaultMediaSourceFactory(resolving))
                 .setLoadControl(loadControl)
                 .setAudioAttributes(new AudioAttributes.Builder()
@@ -84,6 +101,11 @@ public class PlaybackService extends MediaSessionService {
                 .build();
 
         player.addListener(new androidx.media3.common.Player.Listener() {
+            @Override
+            public void onMediaItemTransition(@Nullable MediaItem item, int reason) {
+                LoudnessNormalizer.onNewTrack();
+            }
+
             @Override
             public void onPlayerError(@NonNull androidx.media3.common.PlaybackException error) {
                 // link expirado ou falha: tenta de novo resolvendo o link outra vez, senão pula

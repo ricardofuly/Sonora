@@ -71,6 +71,10 @@ public final class YtExtractor {
         audioCache.clear();
     }
 
+    // ---------------- Normalização de volume ----------------
+    public static boolean getNormalize() { return prefs.getBoolean("normalize", true); }
+    public static void setNormalize(boolean v) { prefs.edit().putBoolean("normalize", v).apply(); }
+
     // ---------------- IDs ----------------
     public static String videoId(String url) {
         try { return YoutubeStreamLinkHandlerFactory.getInstance().getId(url); } catch (Exception e) { return null; }

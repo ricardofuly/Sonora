@@ -182,6 +182,26 @@ function parsePlaylistItem(v) {
   }
   return null;
 }
+// ---------- Normalização: sonoridade (loudness) de cada vídeo informada pelo YouTube ----------
+// loudnessDb = quanto o vídeo está acima (+) ou abaixo (-) do nível de referência do YouTube.
+const loudCache = new Map();
+app.get('/api/loudness/:id', async (req, res) => {
+  const id = String(req.params.id);
+  if (!/^[\w-]{11}$/.test(id)) return res.status(400).json({ error: 'id inválido' });
+  if (loudCache.has(id)) return res.json(loudCache.get(id));
+  const yt = await getYT();
+  let out = { loudnessDb: null };
+  // o cliente WEB exige token; ANDROID_VR devolve o audioConfig sem isso
+  for (const client of ['ANDROID_VR', 'IOS', 'ANDROID']) {
+    try {
+      const a = (await yt.getBasicInfo(id, { client })).player_config?.audio_config;
+      if (typeof a?.loudness_db === 'number') { out = { loudnessDb: a.loudness_db }; break; }
+    } catch {}
+  }
+  if (out.loudnessDb !== null) { loudCache.set(id, out); if (loudCache.size > 2000) loudCache.delete(loudCache.keys().next().value); }
+  res.json(out);
+});
+
 const playlistCache = new Map();
 app.get('/api/playlist/:id', async (req, res) => {
   const id = req.params.id;
