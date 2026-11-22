@@ -304,10 +304,14 @@ function NormalizePanel({ normalize, setNormalize }) {
 function ObsPanel({ showToast }) {
   const [style, setStyle] = useState(() => store.get('sonora.obs.style', 'card'));
   const [hidePaused, setHidePaused] = useState(() => store.get('sonora.obs.hidePaused', false));
-  useEffect(() => { store.set('sonora.obs.style', style); store.set('sonora.obs.hidePaused', hidePaused); }, [style, hidePaused]);
+  const [showFor, setShowFor] = useState(() => store.get('sonora.obs.showFor', 0));
+  useEffect(() => {
+    store.set('sonora.obs.style', style); store.set('sonora.obs.hidePaused', hidePaused); store.set('sonora.obs.showFor', showFor);
+  }, [style, hidePaused, showFor]);
   const params = new URLSearchParams();
   if (style !== 'card') params.set('estilo', style);
   if (hidePaused) params.set('ocultar', 'pausa');
+  if (showFor) params.set('mostrar', showFor);
   const qs = params.toString();
   const url = `${location.origin}/obs${qs ? `?${qs}` : ''}`;
   const size = style === 'mini' ? [500, 120] : [640, 220];
@@ -332,6 +336,12 @@ function ObsPanel({ showToast }) {
         {[['card', 'Cartão'], ['mini', 'Compacto']].map(([k, l]) =>
           <button key={k} className={style === k ? 'on' : ''} onClick={() => setStyle(k)}>{l}</button>)}
       </div>
+      <h3>Quando aparece</h3>
+      <div className="seg">
+        {[[0, 'Sempre'], [10, '10 s'], [15, '15 s'], [30, '30 s']].map(([k, l]) =>
+          <button key={k} className={showFor === k ? 'on' : ''} onClick={() => setShowFor(k)}>{l}</button>)}
+      </div>
+      <p className="muted small" style={{ marginTop: 6 }}>{showFor ? `Aparece por ${showFor} segundos a cada música nova e depois sai.` : 'Fica na tela o tempo todo enquanto houver música.'}</p>
       <label className="switch" style={{ marginTop: 14 }}>
         <input type="checkbox" checked={hidePaused} onChange={e => setHidePaused(e.target.checked)} />
         <span />Esconder o widget quando a música estiver pausada
@@ -341,7 +351,7 @@ function ObsPanel({ showToast }) {
         <button className="btn" onClick={copy}><ClipboardCopy size={16} /> Copiar link</button>
       </div>
       <div className="obs-preview" ref={box} style={{ maxWidth: size[0], height: size[1] * scale }}>
-        <iframe key={style} title="Prévia do widget" src={`/obs.html?demo=1&preview=1${style !== 'card' ? `&estilo=${style}` : ''}`}
+        <iframe key={`${style}${showFor}`} title="Prévia do widget" src={`/obs.html?demo=1&preview=1${style !== 'card' ? `&estilo=${style}` : ''}${showFor ? `&mostrar=${showFor}` : ''}`}
           style={{ width: size[0], height: size[1], transform: `scale(${scale})` }} />
       </div>
       <p className="muted small">Prévia com uma música de exemplo. A cor do widget acompanha a capa da música que estiver tocando.</p>

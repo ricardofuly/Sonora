@@ -11,6 +11,7 @@
     estilo=card | mini      visual do widget (padrão: card)
     cor=ff4d8d              cor de destaque fixa (padrão: tirada da capa da música)
     ocultar=pausa           esconde o widget enquanto a música estiver pausada
+    mostrar=15              aparece por 15 s a cada música nova e depois sai (padrão: sempre visível)
     demo=1                  mostra uma música de exemplo (para ajustar no OBS)
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -242,6 +243,7 @@
   if (q.get('estilo') === 'mini') w.classList.add('mini');
   if (q.get('preview') === '1') document.body.classList.add('preview');
   const hideWhenPaused = q.get('ocultar') === 'pausa';
+  const showFor = Math.max(0, parseFloat(q.get('mostrar')) || 0); // segundos; 0 = sempre visível
   const fixedColor = /^[0-9a-f]{6}$/i.test(q.get('cor') || '') ? '#' + q.get('cor') : null;
 
   let track = null, base = 0, baseAt = 0, curKey = null;
@@ -337,13 +339,17 @@
   }
 
   // ---------- estado ----------
-  let hideTimer;
+  let hideTimer, shownUntil = 0;
   function apply(t) {
     const key = t?.title ? `${t.id}|${t.title}` : null;
     track = t?.title ? t : null;
-    const visible = !!track && !(hideWhenPaused && track.paused);
+    // modo "aparecer por N segundos": cada música nova mostra o widget de novo
+    if (showFor && key && key !== curKey) shownUntil = performance.now() + showFor * 1000;
+    const timeLeft = showFor ? shownUntil - performance.now() : Infinity;
+    const visible = !!track && !(hideWhenPaused && track.paused) && timeLeft > 0;
     clearTimeout(hideTimer);
-    if (!visible) hideTimer = setTimeout(() => w.classList.add('hidden'), track ? 1200 : 300);
+    if (!visible) hideTimer = setTimeout(() => w.classList.add('hidden'), track && timeLeft > 0 ? 1200 : 300);
+    else if (showFor) hideTimer = setTimeout(() => w.classList.add('hidden'), timeLeft);
 
     if (track) {
       base = track.position; baseAt = performance.now() - Math.max(0, (t.now ?? t.at ?? 0) - (t.at ?? 0));
@@ -395,7 +401,7 @@
     ];
     let i = 0;
     const show = () => { const d = demo[i++ % demo.length]; apply({ ...d, paused: false, at: Date.now(), now: Date.now() }); };
-    show(); setInterval(show, 9000);
+    show(); setInterval(show, showFor ? (showFor + 3) * 1000 : 9000);
     return;
   }
 
