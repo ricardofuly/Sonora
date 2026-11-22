@@ -7,7 +7,7 @@ import { REPO, APP_VERSION, isDesktop, checkMobileUpdate, confirmBundleWorks, do
 import {
   House, Search, Library, Plus, Music2, Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Volume2, Volume1, VolumeX,
   MicVocal, X, ChevronLeft, ListMusic, Folder, FolderPlus, Check, Settings as SettingsIcon, RefreshCw, Heart, AudioLines,
-  CircleAlert, CircleCheck, PanelLeftClose, PanelLeftOpen, ChevronDown, Download, Minus, Copy as RestoreIcon, Square, CircleCheckBig, LoaderCircle, Gauge, Keyboard, Trash2, ListPlus, Disc3, Palette, Radio, Ellipsis, Clock3,
+  CircleAlert, CircleCheck, PanelLeftClose, PanelLeftOpen, ChevronDown, Download, Minus, Copy as RestoreIcon, Square, CircleCheckBig, LoaderCircle, Gauge, Keyboard, Trash2, ListPlus, Disc3, Palette, Radio, Ellipsis, Clock3, MonitorPlay, ClipboardCopy,
 } from 'lucide-react';
 import { THEMES, ACCENTS, DEFAULT_APPEARANCE, applyAppearance } from './themes.js';
 
@@ -301,6 +301,54 @@ function NormalizePanel({ normalize, setNormalize }) {
   );
 }
 
+function ObsPanel({ showToast }) {
+  const [style, setStyle] = useState(() => store.get('sonora.obs.style', 'card'));
+  const [hidePaused, setHidePaused] = useState(() => store.get('sonora.obs.hidePaused', false));
+  useEffect(() => { store.set('sonora.obs.style', style); store.set('sonora.obs.hidePaused', hidePaused); }, [style, hidePaused]);
+  const params = new URLSearchParams();
+  if (style !== 'card') params.set('estilo', style);
+  if (hidePaused) params.set('ocultar', 'pausa');
+  const qs = params.toString();
+  const url = `${location.origin}/obs${qs ? `?${qs}` : ''}`;
+  const size = style === 'mini' ? [500, 120] : [640, 220];
+  // a prévia encolhe para caber no painel
+  const box = useRef(null);
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    if (!box.current) return;
+    const ro = new ResizeObserver(([e]) => setScale(Math.min(1, e.contentRect.width / size[0])));
+    ro.observe(box.current);
+    return () => ro.disconnect();
+  }, [size[0]]);
+  const copy = async () => {
+    try { await navigator.clipboard.writeText(url); showToast('Link do widget copiado.', 'ok', 2500); }
+    catch { showToast('Não foi possível copiar; selecione o link e copie.'); }
+  };
+  return (
+    <section className="panel">
+      <h2><MonitorPlay size={18} /> Widget para o OBS</h2>
+      <p className="muted">Mostra na sua live a música que está tocando, com capa, animações e barra de progresso. No OBS, adicione uma fonte <b>Navegador</b>, cole o link abaixo e use <b>{size[0]} × {size[1]}</b> de tamanho.</p>
+      <div className="seg">
+        {[['card', 'Cartão'], ['mini', 'Compacto']].map(([k, l]) =>
+          <button key={k} className={style === k ? 'on' : ''} onClick={() => setStyle(k)}>{l}</button>)}
+      </div>
+      <label className="switch" style={{ marginTop: 14 }}>
+        <input type="checkbox" checked={hidePaused} onChange={e => setHidePaused(e.target.checked)} />
+        <span />Esconder o widget quando a música estiver pausada
+      </label>
+      <div className="row" style={{ marginTop: 14 }}>
+        <input readOnly value={url} onFocus={e => e.target.select()} aria-label="Link do widget" />
+        <button className="btn" onClick={copy}><ClipboardCopy size={16} /> Copiar link</button>
+      </div>
+      <div className="obs-preview" ref={box} style={{ maxWidth: size[0], height: size[1] * scale }}>
+        <iframe key={style} title="Prévia do widget" src={`/obs.html?demo=1&preview=1${style !== 'card' ? `&estilo=${style}` : ''}`}
+          style={{ width: size[0], height: size[1], transform: `scale(${scale})` }} />
+      </div>
+      <p className="muted small">Prévia com uma música de exemplo. A cor do widget acompanha a capa da música que estiver tocando.</p>
+    </section>
+  );
+}
+
 function DlBadge({ id, done, progress }) {
   if (done) return <span className="dl-badge done" title="Baixada"><CircleCheckBig size={13} /></span>;
   if (typeof progress === 'number') return <span className="dl-badge" title="Baixando"><LoaderCircle size={13} className="spin" /> {Math.round(progress * 100)}%</span>;
@@ -400,6 +448,7 @@ function Settings({ genres, setGenres, onLocalChange, appearance, setAppearance,
       <UpdatesPanel showToast={showToast} />
       {!isNative && <MediaKeysPanel showToast={showToast} />}
       {!isNative && <DiscordPanel discord={discord} setDiscord={setDiscord} showToast={showToast} />}
+      {!isNative && <ObsPanel showToast={showToast} />}
     </div>
   );
 }

@@ -354,3 +354,7 @@ svg { flex-shrink:0; }
 .app.collapsed .section { padding:14px 0 6px; justify-content:center; border-top:1px solid color-mix(in srgb, var(--border) 60%, transparent); margin-top:8px; width:48px; }
 .app.collapsed .playlists { display:flex; flex-direction:column; align-items:center; gap:2px; width:100%; }
 @media (max-width:700px) { .app.collapsed { grid-template-columns:1fr; } .collapse-btn { display:none; } }
+
+/* Prévia do widget do OBS */
+.obs-preview { margin:14px 0 8px; border-radius:12px; overflow:hidden; border:1px solid var(--surface-2); max-width:640px; }
+.obs-preview iframe { display:block; border:0; max-width:none; transform-origin:0 0; }

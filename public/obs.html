@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonora · Tocando agora</title>
+<!--
+  Widget "Tocando agora" do Sonora para o OBS (Fonte → Navegador).
+  URL: http://localhost:3001/obs   (largura 640 × altura 220 para o estilo "card")
+  Opções na URL:
+    estilo=card | mini      visual do widget (padrão: card)
+    cor=ff4d8d              cor de destaque fixa (padrão: tirada da capa da música)
+    ocultar=pausa           esconde o widget enquanto a música estiver pausada
+    demo=1                  mostra uma música de exemplo (para ajustar no OBS)
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --accent: #8b5cf6;
+    --accent2: #ec4899;
+    --text: #fff;
+    --muted: rgba(255, 255, 255, .68);
+    --ease: cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: transparent; overflow: hidden; }
+  body {
+    font-family: 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif;
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+    padding: 24px;
+  }
+  body.preview { background: repeating-conic-gradient(#2a2a32 0 25%, #222229 0 50%) 0 0 / 24px 24px; min-height: 100vh; }
+  img { display: block; }
+
+  /* ---------- Card ---------- */
+  .card {
+    position: relative;
+    width: 580px;
+    height: 164px;
+    border-radius: 26px;
+    isolation: isolate;
+    transition: transform .9s var(--ease), opacity .7s var(--ease), filter .7s var(--ease);
+  }
+  .card.hidden { transform: translateY(26px) scale(.94); opacity: 0; filter: blur(10px); }
+
+  /* borda luminosa girando */
+  .glow {
+    position: absolute; inset: -2px; border-radius: 28px; z-index: -2; overflow: hidden;
+  }
+  .glow::before {
+    content: ''; position: absolute; inset: -150%;
+    background: conic-gradient(from 0deg, transparent 0 55%, var(--accent) 70%, var(--accent2) 85%, transparent 100%);
+    animation: spin 5s linear infinite;
+  }
+  .card.paused .glow::before { animation-play-state: paused; opacity: .35; }
+  .shadow {
+    position: absolute; inset: 12px 30px -10px; z-index: -3; border-radius: 30px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    filter: blur(34px); opacity: .45; transition: opacity .8s, background 1.2s;
+  }
+  .card.paused .shadow { opacity: .15; }
+
+  .panel {
+    position: absolute; inset: 0; border-radius: 26px; overflow: hidden; z-index: -1;
+    background: #0d0b14;
+  }
+  .panel .bg {
+    position: absolute; inset: -40px; background-size: cover; background-position: center;
+    filter: blur(38px) saturate(1.6) brightness(.55); transform: scale(1.1);
+    transition: opacity 1s var(--ease);
+  }
+  .panel::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      linear-gradient(100deg, rgba(10, 8, 18, .25) 0%, rgba(10, 8, 18, .72) 45%, rgba(10, 8, 18, .86) 100%),
+      radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--accent) 30%, transparent), transparent 60%);
+  }
+  /* brilho que passa pelo card de tempos em tempos */
+  .panel .sheen {
+    position: absolute; inset: 0; z-index: 1;
+    background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .09) 50%, transparent 65%);
+    transform: translateX(-100%); animation: sheen 7s var(--ease) infinite 1.5s;
+  }
+  .card.paused .sheen { animation: none; }
+
+  /* capa + disco de vinil */
+  .art { position: absolute; left: 18px; top: 18px; width: 128px; height: 128px; }
+  .vinyl {
+    position: absolute; inset: 6px; border-radius: 50%;
+    background:
+      radial-gradient(circle, transparent 0 17%, rgba(255,255,255,.08) 17.5% 18%, transparent 18.5%),
+      repeating-radial-gradient(circle, #111 0 2px, #1b1b1f 2.5px 3.5px),
+      #111;
+    box-shadow: 0 8px 22px rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255,255,255,.06);
+    transition: transform 1s var(--ease);
+  }
+  .vinyl::after { /* reflexo */
+    content: ''; position: absolute; inset: 0; border-radius: 50%;
+    background: conic-gradient(from 30deg, transparent 0 10%, rgba(255,255,255,.14) 15%, transparent 22% 60%, rgba(255,255,255,.1) 65%, transparent 72%);
+  }
+  .vinyl .label {
+    position: absolute; inset: 32%; border-radius: 50%; overflow: hidden;
+    background: var(--accent); box-shadow: 0 0 0 3px rgba(0,0,0,.4);
+  }
+  .vinyl .label img { width: 100%; height: 100%; object-fit: cover; }
+  .vinyl .label::after {
+    content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 9px; margin: -4.5px;
+    border-radius: 50%; background: #0d0b14;
+  }
+  .vinyl .spinner { position: absolute; inset: 0; animation: spin 3.2s linear infinite; }
+  .card.playing .vinyl { transform: translateX(46px) rotate(0); }
+  .card.paused .vinyl .spinner { animation-play-state: paused; }
+
+  .cover {
+    position: absolute; inset: 0; border-radius: 18px; overflow: hidden;
+    box-shadow: 0 14px 30px rgba(0, 0, 0, .55), 0 0 0 1px rgba(255,255,255,.1);
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    transition: transform .8s var(--ease);
+  }
+  .card.playing .cover { animation: breathe 4s ease-in-out infinite; }
+  .cover img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transition: opacity .7s var(--ease), transform .9s var(--ease); }
+  .cover img.letterbox { transform: scale(1.34); }
+  .cover img.out { opacity: 0; transform: scale(1.15); }
+  .cover img.letterbox.out { transform: scale(1.5); }
+  .cover .ph { position: absolute; inset: 0; display: grid; place-items: center; transition: opacity .4s; }
+  .cover.has-img .ph { opacity: 0; }
+  .cover .ph svg { width: 46px; height: 46px; opacity: .9; }
+
+  /* textos */
+  .info {
+    position: absolute; left: 204px; right: 26px; top: 20px; bottom: 18px;
+    display: flex; flex-direction: column; min-width: 0;
+  }
+  .badge {
+    display: inline-flex; align-items: center; gap: 9px; align-self: flex-start;
+    font-size: 11px; font-weight: 800; letter-spacing: .16em; text-transform: uppercase;
+    color: color-mix(in srgb, var(--accent) 35%, white);
+    padding: 5px 11px 5px 9px; border-radius: 999px;
+    background: color-mix(in srgb, var(--accent) 22%, rgba(255,255,255,.04));
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .eq { display: inline-flex; align-items: flex-end; gap: 2.5px; height: 12px; }
+  .eq i { width: 3px; height: 100%; border-radius: 2px; background: currentColor; transform-origin: bottom; animation: eq 1s ease-in-out infinite; }
+  .eq i:nth-child(2) { animation-duration: .8s; animation-delay: -.3s; }
+  .eq i:nth-child(3) { animation-duration: 1.15s; animation-delay: -.6s; }
+  .eq i:nth-child(4) { animation-duration: .9s; animation-delay: -.15s; }
+  .paused .eq i { animation-play-state: paused; transform: scaleY(.25); }
+
+  .title {
+    margin-top: 11px; font-size: 24px; font-weight: 800; line-height: 1.2; letter-spacing: -.01em;
+    white-space: nowrap; overflow: hidden;
+    mask-image: linear-gradient(90deg, #000 0 88%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, #000 0 88%, transparent);
+  }
+  .title.fits { mask-image: none; -webkit-mask-image: none; }
+  .title .track { display: inline-flex; gap: 56px; }
+  .title.scroll .track { animation: marquee var(--marquee, 12s) linear infinite 2s; }
+  .artist {
+    margin-top: 3px; font-size: 15px; font-weight: 500; color: var(--muted);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .progress { margin-top: auto; }
+  .bar { position: relative; height: 5px; border-radius: 5px; background: rgba(255, 255, 255, .14); }
+  .fill {
+    position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    box-shadow: 0 0 12px color-mix(in srgb, var(--accent2) 70%, transparent);
+  }
+  .knob {
+    position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; left: 0;
+    border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent2) 45%, transparent), 0 0 14px var(--accent2);
+  }
+  .times { display: flex; justify-content: space-between; margin-top: 7px; font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .progress.live .bar, .progress.live .times { display: none; }
+
+  /* troca de música: textos saem e entram em sequência */
+  .info > * { transition: transform .55s var(--ease), opacity .45s var(--ease), filter .45s; }
+  .swap .info > * { transform: translateX(18px); opacity: 0; filter: blur(4px); }
+  .info > :nth-child(2) { transition-delay: .05s; }
+  .info > :nth-child(3) { transition-delay: .1s; }
+  .info > :nth-child(4) { transition-delay: .15s; }
+
+  /* ---------- Mini (pílula) ---------- */
+  .mini { width: 440px; height: 70px; border-radius: 999px; }
+  .mini .glow { border-radius: 999px; }
+  .mini .panel { border-radius: 999px; }
+  .mini .shadow { inset: 8px 40px -6px; border-radius: 999px; }
+  .mini .art { left: 9px; top: 9px; width: 52px; height: 52px; }
+  .mini .cover { border-radius: 50%; animation: spin 9s linear infinite !important; }
+  .mini.paused .cover { animation-play-state: paused !important; }
+  .mini .cover::after { content: ''; position: absolute; left: 50%; top: 50%; width: 10px; height: 10px; margin: -5px; border-radius: 50%; background: #0d0b14; box-shadow: 0 0 0 2px rgba(255,255,255,.25); }
+  .mini .vinyl { display: none; }
+  .mini .info { left: 74px; right: 26px; top: 12px; bottom: 12px; justify-content: center; }
+  .mini .badge { display: none; }
+  .mini .title { margin: 0; font-size: 16.5px; display: flex; align-items: center; gap: 10px; }
+  .mini .title .eq { flex: none; color: color-mix(in srgb, var(--accent) 40%, white); }
+  .mini .artist { margin-top: 1px; font-size: 13px; }
+  .mini .progress { position: absolute; left: 0; right: 0; bottom: -7px; margin: 0; }
+  .mini .bar { height: 3px; background: rgba(255,255,255,.1); }
+  .mini .knob, .mini .times { display: none; }
+  .card:not(.mini) .title .eq { display: none; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes eq { 0%, 100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+  @keyframes breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+  @keyframes sheen { 0% { transform: translateX(-100%); } 22%, 100% { transform: translateX(100%); } }
+  @keyframes marquee { 0%, 8% { transform: translateX(0); } 92%, 100% { transform: translateX(var(--shift)); } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; } }
+</style>
+</head>
+<body>
+<div id="w" class="card hidden swap">
+  <div class="shadow"></div>
+  <div class="glow"></div>
+  <div class="panel"><div class="bg" id="bg"></div><div class="sheen"></div></div>
+  <div class="art">
+    <div class="vinyl"><div class="spinner"><div class="label"><img id="label" alt=""></div></div></div>
+    <div class="cover" id="cover">
+      <div class="ph"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>
+    </div>
+  </div>
+  <div class="info">
+    <div class="badge"><span class="eq"><i></i><i></i><i></i><i></i></span><span id="status">Tocando agora</span></div>
+    <div class="title" id="titleBox"><span class="eq"><i></i><i></i><i></i><i></i></span><span class="track" id="title"></span></div>
+    <div class="artist" id="artist"></div>
+    <div class="progress" id="progress">
+      <div class="bar"><div class="fill" id="fill"></div><div class="knob" id="knob"></div></div>
+      <div class="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const q = new URLSearchParams(location.search);
+  const $ = id => document.getElementById(id);
+  const w = $('w');
+  if (q.get('estilo') === 'mini') w.classList.add('mini');
+  if (q.get('preview') === '1') document.body.classList.add('preview');
+  const hideWhenPaused = q.get('ocultar') === 'pausa';
+  const fixedColor = /^[0-9a-f]{6}$/i.test(q.get('cor') || '') ? '#' + q.get('cor') : null;
+
+  let track = null, base = 0, baseAt = 0, curKey = null;
+
+  const fmt = s => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const isYt = id => id && !String(id).startsWith('local_');
+
+  // ---------- cor de destaque tirada da capa ----------
+  function setColors(a, b) {
+    document.documentElement.style.setProperty('--accent', a);
+    document.documentElement.style.setProperty('--accent2', b);
+  }
+  function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2;
+    if (max === min) return [0, 0, l];
+    const d = max - min, s = l > .5 ? d / (2 - max - min) : d / (max + min);
+    const h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    return [h * 60, s, l];
+  }
+  function pickColors(img) {
+    if (fixedColor) { setColors(fixedColor, fixedColor); return; }
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(img, 0, 0, 32, 32);
+      const d = x.getImageData(0, 0, 32, 32).data;
+      // agrupa por matiz e escolhe a cor mais viva e frequente
+      const bins = new Array(24).fill(0).map(() => ({ w: 0, h: 0, s: 0 }));
+      for (let i = 0; i < d.length; i += 4) {
+        const [h, s, l] = rgbToHsl(d[i], d[i + 1], d[i + 2]);
+        if (s < .25 || l < .15 || l > .85) continue;
+        const b = bins[Math.floor(h / 15) % 24], wgt = s * (1 - Math.abs(l - .5) * 1.4);
+        b.w += wgt; b.h += h * wgt; b.s += s * wgt;
+      }
+      const best = bins.reduce((a, b) => (b.w > a.w ? b : a));
+      if (best.w < 2) { setColors('#8b5cf6', '#ec4899'); return; }
+      const h = best.h / best.w, s = Math.min(95, Math.max(65, best.s / best.w * 100));
+      setColors(`hsl(${h} ${s}% 62%)`, `hsl(${(h + 38) % 360} ${s}% 60%)`);
+    } catch { setColors('#8b5cf6', '#ec4899'); } // imagem sem CORS: mantém o padrão
+  }
+
+  // ---------- capa ----------
+  function coverUrls(t) {
+    if (isYt(t.id)) return [`https://i.ytimg.com/vi/${t.id}/maxresdefault.jpg`, `https://i.ytimg.com/vi/${t.id}/hqdefault.jpg`];
+    return t.thumbnail ? [t.thumbnail] : [];
+  }
+  function loadImg(urls) {
+    return new Promise(resolve => {
+      const tryAt = i => {
+        if (i >= urls.length) return resolve(null);
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => (img.naturalWidth <= 120 && i < urls.length - 1 ? tryAt(i + 1) : resolve(img)); // 120×90 = "sem imagem" do YouTube
+        img.onerror = () => tryAt(i + 1);
+        img.src = urls[i];
+      };
+      tryAt(0);
+    });
+  }
+  async function showCover(t) {
+    const img = await loadImg(coverUrls(t));
+    if (track !== t) return;
+    const box = $('cover');
+    box.querySelectorAll('img').forEach(old => { old.classList.add('out'); setTimeout(() => old.remove(), 900); });
+    box.classList.toggle('has-img', !!img);
+    if (!img) { setColors(fixedColor || '#8b5cf6', fixedColor || '#ec4899'); $('label').removeAttribute('src'); $('bg').style.backgroundImage = ''; return; }
+    // hqdefault tem faixas pretas em cima e embaixo: amplia para esconder
+    if (/hqdefault/.test(img.src)) img.classList.add('letterbox');
+    img.classList.add('out');
+    img.alt = '';
+    box.appendChild(img);
+    requestAnimationFrame(() => requestAnimationFrame(() => img.classList.remove('out')));
+    $('label').src = img.src;
+    $('bg').style.backgroundImage = `url("${img.src}")`;
+    pickColors(img);
+  }
+
+  // ---------- título rolando quando não cabe ----------
+  function fitTitle() {
+    const box = $('titleBox'), tr = $('title');
+    box.classList.remove('scroll', 'fits');
+    tr.innerHTML = `<span>${esc(track?.title || '')}</span>`;
+    const avail = box.clientWidth - (w.classList.contains('mini') ? 30 : 0);
+    const width = tr.scrollWidth;
+    if (width <= avail) { box.classList.add('fits'); return; }
+    tr.innerHTML = `<span>${esc(track.title)}</span><span>${esc(track.title)}</span>`;
+    const shift = width + 56;
+    box.style.setProperty('--shift', `-${shift}px`);
+    box.style.setProperty('--marquee', `${Math.max(8, shift / 38)}s`);
+    box.classList.add('scroll');
+  }
+
+  // ---------- estado ----------
+  let hideTimer;
+  function apply(t) {
+    const key = t?.title ? `${t.id}|${t.title}` : null;
+    track = t?.title ? t : null;
+    const visible = !!track && !(hideWhenPaused && track.paused);
+    clearTimeout(hideTimer);
+    if (!visible) hideTimer = setTimeout(() => w.classList.add('hidden'), track ? 1200 : 300);
+
+    if (track) {
+      base = track.position; baseAt = performance.now() - Math.max(0, (t.now ?? t.at ?? 0) - (t.at ?? 0));
+      w.classList.toggle('paused', track.paused);
+      w.classList.toggle('playing', !track.paused);
+      $('status').textContent = track.paused ? 'Pausado' : 'Tocando agora';
+      $('progress').classList.toggle('live', !track.duration);
+      if (key !== curKey) {
+        const first = curKey === null || w.classList.contains('hidden');
+        curKey = key;
+        w.classList.add('swap');
+        setTimeout(() => {
+          if (curKey !== key) return;
+          $('artist').textContent = track.author || '';
+          fitTitle();
+          w.classList.remove('swap');
+        }, first ? 50 : 420);
+        showCover(track);
+      }
+      if (visible) w.classList.remove('hidden');
+    } else {
+      curKey = null;
+      w.classList.remove('playing');
+    }
+  }
+
+  function tick() {
+    if (track && track.duration) {
+      const pos = Math.min(track.duration, base + (track.paused ? 0 : (performance.now() - baseAt) / 1000));
+      const pct = (pos / track.duration) * 100;
+      $('fill').style.width = pct + '%';
+      $('knob').style.left = pct + '%';
+      $('cur').textContent = fmt(pos);
+      $('dur').textContent = fmt(track.duration);
+    }
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  if (q.get('demo') === '1') {
+    // capas de exemplo desenhadas aqui mesmo (SVG), sem depender da internet
+    const art = (a, b, c) => 'data:image/svg+xml,' + encodeURIComponent(
+      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>` +
+      `<rect width="300" height="300" fill="url(#g)"/><circle cx="210" cy="95" r="58" fill="${c}" opacity=".9"/>` +
+      `<path d="M0 230 Q75 170 150 215 T300 200 V300 H0Z" fill="#000" opacity=".28"/><path d="M0 255 Q90 215 170 250 T300 240 V300 H0Z" fill="#000" opacity=".35"/></svg>`);
+    const demo = [
+      { id: 'local_demo1', thumbnail: art('#3b0764', '#db2777', '#fbbf24'), title: 'Noites de Neon — Versão Estendida ao Vivo no Estúdio', author: 'Sonora Ensemble', duration: 214, position: 48 },
+      { id: 'local_demo2', thumbnail: art('#064e3b', '#0ea5e9', '#a7f3d0'), title: 'Maré Alta', author: 'Lua Clara', duration: 187, position: 12 },
+    ];
+    let i = 0;
+    const show = () => { const d = demo[i++ % demo.length]; apply({ ...d, paused: false, at: Date.now(), now: Date.now() }); };
+    show(); setInterval(show, 9000);
+    return;
+  }
+
+  // Recebe a música atual do Sonora (reconecta sozinho se o app fechar e abrir de novo)
+  const es = new EventSource('/api/nowplaying/stream');
+  es.addEventListener('track', e => { try { apply(JSON.parse(e.data)); } catch {} });
+})();
+</script>
+</body>
+</html>

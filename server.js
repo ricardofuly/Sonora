@@ -358,7 +358,35 @@ app.post('/api/presence/settings', async (req, res) => {
 });
 app.post('/api/presence/reconnect', async (_req, res) => { await connectRpc(); res.json(discordStatus()); });
 
+// ---------- Widget para o OBS (fonte de navegador em /obs) ----------
+// A página do app avisa a música atual (mesmo envio da presença no Discord); o widget recebe por SSE.
+let nowPlaying = { title: null };
+const obsClients = new Set();
+function setNowPlaying(b) {
+  const { id, title, author, thumbnail, duration, position, paused } = b || {};
+  nowPlaying = title
+    ? { id: id || null, title: String(title), author: author || '', thumbnail: thumbnail || null,
+        duration: +duration || 0, position: +position || 0, paused: !!paused, at: Date.now() }
+    : { title: null, at: Date.now() };
+  const msg = `event: track\ndata: ${JSON.stringify({ ...nowPlaying, now: nowPlaying.at })}\n\n`;
+  for (const c of obsClients) c.write(msg);
+}
+app.get('/api/nowplaying', (_req, res) => res.json({ ...nowPlaying, now: Date.now() }));
+app.get('/api/nowplaying/stream', (req, res) => {
+  res.set({ 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', Connection: 'keep-alive', 'Access-Control-Allow-Origin': '*' });
+  res.flushHeaders();
+  res.write(`retry: 2000\nevent: track\ndata: ${JSON.stringify({ ...nowPlaying, now: Date.now() })}\n\n`);
+  obsClients.add(res);
+  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
+  req.on('close', () => { clearInterval(ping); obsClients.delete(res); });
+});
+app.get(['/obs', '/obs/'], (_req, res, next) => {
+  const f = path.join(APP_DIR, 'dist', 'obs.html');
+  fs.existsSync(f) ? res.sendFile(f) : next();
+});
+
 app.post('/api/presence', async (req, res) => {
+  setNowPlaying(req.body);
   if (!rpcReady) return res.json({ ok: false });
   const { title, author, thumbnail, duration, position, paused, id } = req.body || {};
   try {
