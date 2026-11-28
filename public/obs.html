@@ -33,7 +33,15 @@
     color: var(--text);
     -webkit-font-smoothing: antialiased;
     padding: 24px;
+    /* o widget fica preso no canto inferior esquerdo da fonte do OBS:
+       ao virar compacto ele encolhe para baixo, sem sair da posição */
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: flex-start;
   }
+  .card { flex: none; }
   body.preview { background: repeating-conic-gradient(#2a2a32 0 25%, #222229 0 50%) 0 0 / 24px 24px; min-height: 100vh; }
   img { display: block; }
 
