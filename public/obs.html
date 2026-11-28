@@ -12,6 +12,7 @@
     cor=ff4d8d              cor de destaque fixa (padrão: tirada da capa da música)
     ocultar=pausa           esconde o widget enquanto a música estiver pausada
     mostrar=15              aparece por 15 s a cada música nova e depois sai (padrão: sempre visível)
+    encolher=15             mostra o cartão por 15 s a cada música nova e depois vira o compacto, que fica na tela
     demo=1                  mostra uma música de exemplo (para ajustar no OBS)
 -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -43,7 +44,8 @@
     height: 164px;
     border-radius: 26px;
     isolation: isolate;
-    transition: transform .9s var(--ease), opacity .7s var(--ease), filter .7s var(--ease);
+    transition: transform .9s var(--ease), opacity .7s var(--ease), filter .7s var(--ease),
+      width .65s var(--ease), height .65s var(--ease), border-radius .65s var(--ease);
   }
   .card.hidden { transform: translateY(26px) scale(.94); opacity: 0; filter: blur(10px); }
 
@@ -60,7 +62,8 @@
   .shadow {
     position: absolute; inset: 12px 30px -10px; z-index: -3; border-radius: 30px;
     background: linear-gradient(90deg, var(--accent), var(--accent2));
-    filter: blur(34px); opacity: .45; transition: opacity .8s, background 1.2s;
+    filter: blur(34px); opacity: .45;
+    transition: opacity .8s, background 1.2s, inset .65s var(--ease), border-radius .65s var(--ease);
   }
   .card.paused .shadow { opacity: .15; }
 
@@ -185,6 +188,11 @@
   .info > :nth-child(3) { transition-delay: .1s; }
   .info > :nth-child(4) { transition-delay: .15s; }
 
+  /* troca entre cartão e compacto: o conteúdo some enquanto o formato muda */
+  .glow, .panel { transition: border-radius .65s var(--ease); }
+  .art, .info { transition: opacity .25s ease; }
+  .morph .art, .morph .info { opacity: 0; }
+
   /* ---------- Mini (pílula) ---------- */
   .mini { width: 440px; height: 70px; border-radius: 999px; }
   .mini .glow { border-radius: 999px; }
@@ -244,6 +252,8 @@
   if (q.get('preview') === '1') document.body.classList.add('preview');
   const hideWhenPaused = q.get('ocultar') === 'pausa';
   const showFor = Math.max(0, parseFloat(q.get('mostrar')) || 0); // segundos; 0 = sempre visível
+  const shrinkAfter = showFor ? 0 : Math.max(0, parseFloat(q.get('encolher')) || 0); // segundos até virar compacto
+  if (shrinkAfter) w.classList.remove('mini'); // começa sempre como cartão
   const fixedColor = /^[0-9a-f]{6}$/i.test(q.get('cor') || '') ? '#' + q.get('cor') : null;
 
   let track = null, base = 0, baseAt = 0, curKey = null;
@@ -339,10 +349,31 @@
   }
 
   // ---------- estado ----------
-  let hideTimer, shownUntil = 0;
+  let hideTimer, shownUntil = 0, shrinkTimer, morphTimer;
+  // cartão ⇄ compacto com o widget na tela: some o conteúdo, muda o formato, mostra de novo
+  function setCompact(on) {
+    clearTimeout(morphTimer);
+    if (w.classList.contains('mini') === on && !w.classList.contains('morph')) return;
+    if (w.classList.contains('hidden')) { w.classList.toggle('mini', on); w.classList.remove('morph'); return; }
+    w.classList.add('morph');
+    morphTimer = setTimeout(() => {
+      w.classList.toggle('mini', on);
+      morphTimer = setTimeout(() => {
+        if (track) fitTitle(); // mede o título já no tamanho novo
+        w.classList.remove('morph');
+      }, 650);
+    }, 250);
+  }
+
   function apply(t) {
     const key = t?.title ? `${t.id}|${t.title}` : null;
     track = t?.title ? t : null;
+    // modo "cartão e depois compacto": cada música nova volta para o cartão
+    if (shrinkAfter && key && key !== curKey) {
+      setCompact(false);
+      clearTimeout(shrinkTimer);
+      shrinkTimer = setTimeout(() => setCompact(true), shrinkAfter * 1000);
+    }
     // modo "aparecer por N segundos": cada música nova mostra o widget de novo
     if (showFor && key && key !== curKey) shownUntil = performance.now() + showFor * 1000;
     const timeLeft = showFor ? shownUntil - performance.now() : Infinity;
@@ -401,7 +432,7 @@
     ];
     let i = 0;
     const show = () => { const d = demo[i++ % demo.length]; apply({ ...d, paused: false, at: Date.now(), now: Date.now() }); };
-    show(); setInterval(show, showFor ? (showFor + 3) * 1000 : 9000);
+    show(); setInterval(show, showFor ? (showFor + 3) * 1000 : shrinkAfter ? (shrinkAfter + 5) * 1000 : 9000);
     return;
   }
 
